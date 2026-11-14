@@ -7,6 +7,13 @@ import {
   validateTrack,
   keyIsUncertain,
 } from "./core.mjs";
+import {
+  audioStoreAvailable,
+  saveAudio,
+  loadAllAudio,
+  deleteAudio,
+  clearAudio,
+} from "./audio-store.mjs";
 const $ = (s) => document.querySelector(s),
   $$ = (s) => [...document.querySelectorAll(s)],
   esc = (s) =>
@@ -373,6 +380,7 @@ function renderSaved() {
   $("#savedEmpty").hidden = !!saved.length;
 }
 function render() {
+  renderAudioStatus();
   renderLibrary();
   renderSet();
   renderSaved();
@@ -408,7 +416,7 @@ function editTrack(id) {
   };
   modal(
     id ? "Edit track" : "Add track",
-    `<form id="trackForm"><label>Track title<input name="title" value="${esc(t.title)}" required maxlength="160"></label><label>Artist<input name="artist" value="${esc(t.artist)}" maxlength="160"></label><div class="formgrid"><label>BPM<input name="bpm" type="number" min="40" max="240" step=".1" value="${t.bpm}" required></label><label>Camelot key<select name="key">${Array.from({ length: 12 }, (_, i) => ["A", "B"].map((m) => `<option ${t.key === `${i + 1}${m}` ? "selected" : ""}>${i + 1}${m}</option>`).join("")).join("")}</select></label><label>Energy (1 to 10)<input name="energy" type="number" min="1" max="10" value="${t.energy}" required></label><label>Duration (seconds)<input name="duration" type="number" min="1" max="7200" value="${t.duration}" required></label></div><label>Genre<select name="genre">${[...new Set([...genreChoices, t.genre])].map((g) => `<option ${g === t.genre ? "selected" : ""}>${g}</option>`).join("")}</select></label>${Number.isFinite(t.keyConfidence) ? `<p class="${keyIsUncertain(t) ? "warn" : ""}">Detected key confidence: <b class="mono">${t.keyConfidence.toFixed(2)}</b>${keyIsUncertain(t) ? ", low. Check the key by ear." : "."} Changing the key marks it as checked.</p>` : ""}<div class="formerror" id="formError"></div><button class="btn btn-primary full" type="submit">${id ? "Save changes" : "Add track"}</button>${id ? '<button class="btn btn-quiet full" type="button" id="deleteTrack">Remove from library</button>' : ""}<p>${t.source === "demo" ? "Demo metadata only, no audio. Adjust it to match your version of the track." : t.source === "audio" ? "Analyzed from audio. Check BPM, key and energy by ear before you play out." : "Copy the values from your DJ software or enter your own."}</p></form>`,
+    `<form id="trackForm"><label>Track title<input name="title" value="${esc(t.title)}" required maxlength="160"></label><label>Artist<input name="artist" value="${esc(t.artist)}" maxlength="160"></label><div class="formgrid"><label>BPM<input name="bpm" type="number" min="40" max="240" step=".1" value="${t.bpm}" required></label><label>Camelot key<select name="key">${Array.from({ length: 12 }, (_, i) => ["A", "B"].map((m) => `<option ${t.key === `${i + 1}${m}` ? "selected" : ""}>${i + 1}${m}</option>`).join("")).join("")}</select></label><label>Energy (1 to 10)<input name="energy" type="number" min="1" max="10" value="${t.energy}" required></label><label>Duration (seconds)<input name="duration" type="number" min="1" max="7200" value="${t.duration}" required></label></div><label>Genre<select name="genre">${[...new Set([...genreChoices, t.genre])].map((g) => `<option ${g === t.genre ? "selected" : ""}>${g}</option>`).join("")}</select></label>${Number.isFinite(t.keyConfidence) ? `<p class="${keyIsUncertain(t) ? "warn" : ""}">Detected key confidence: <b class="mono">${t.keyConfidence.toFixed(2)}</b>${keyIsUncertain(t) ? ", low. Check the key by ear." : "."} Changing the key marks it as checked.</p>` : ""}<div class="formerror" id="formError"></div><button class="btn btn-primary full" type="submit">${id ? "Save changes" : "Add track"}</button>${id && media.has(id) ? '<button class="btn btn-quiet full" type="button" id="deleteTrackAudio">Delete stored audio for this track</button>' : ""}${id ? '<button class="btn btn-quiet full" type="button" id="deleteTrack">Remove from library</button>' : ""}<p>${t.source === "demo" ? "Demo metadata only, no audio. Adjust it to match your version of the track." : t.source === "audio" ? "Analyzed from audio. Check BPM, key and energy by ear before you play out." : "Copy the values from your DJ software or enter your own."}</p></form>`,
   );
   $("#trackForm").onsubmit = (e) => {
     e.preventDefault();
@@ -432,6 +440,13 @@ function editTrack(id) {
       $("#formError").textContent = err.message;
     }
   };
+  if (id && media.has(id))
+    $("#deleteTrackAudio").onclick = () => {
+      forgetAudio(id);
+      render();
+      closeModal();
+      toast("Stored audio deleted. The track's metadata is kept.");
+    };
   if (id)
     $("#deleteTrack").onclick = () => {
       modal(
@@ -445,11 +460,7 @@ function editTrack(id) {
           ...s,
           trackIds: s.trackIds.filter((x) => x !== id),
         }));
-        if (playing === id) stopAudio();
-        if (media.has(id)) {
-          URL.revokeObjectURL(media.get(id).url);
-          media.delete(id);
-        }
+        forgetAudio(id);
         persist();
         render();
         closeModal();
@@ -581,10 +592,72 @@ async function importAudio(file) {
       wave: result.wave,
     });
   tracks.push(t);
-  media.set(id, { url: URL.createObjectURL(file), wave: result.wave });
+  media.set(id, {
+    url: URL.createObjectURL(file),
+    wave: result.wave,
+    size: file.size,
+  });
   persist();
   render();
+  await storeAudio(id, file, result.wave);
   return 1;
+}
+// Audio persistence. The media map holds an object URL per track for the
+// <audio> element; IndexedDB holds the file itself so the map can be
+// rebuilt after a reload.
+let storeWarned = false;
+async function storeAudio(id, file, wave) {
+  if (!audioStoreAvailable) return;
+  try {
+    await saveAudio(id, file, wave);
+    // Ask the browser not to evict our storage under pressure. Browsers may
+    // grant this silently, ask, or say no; the app works either way.
+    navigator.storage?.persist?.().catch(() => {});
+  } catch {
+    media.get(id) && (media.get(id).stored = false);
+    if (!storeWarned)
+      toast("Browser storage is full. This audio will play until you reload.");
+    storeWarned = true;
+  }
+  renderAudioStatus();
+}
+async function restoreStoredAudio() {
+  if (!audioStoreAvailable) return;
+  let records;
+  try {
+    records = await loadAllAudio();
+  } catch {
+    return;
+  }
+  const ids = new Set(tracks.map((t) => t.id));
+  for (const r of records) {
+    if (!ids.has(r.id)) {
+      // Track was removed in another tab or by a restore: drop the file.
+      deleteAudio(r.id).catch(() => {});
+      continue;
+    }
+    if (!media.has(r.id))
+      media.set(r.id, {
+        url: URL.createObjectURL(r.blob),
+        wave: r.wave || [],
+        size: r.size || r.blob.size,
+      });
+  }
+  render();
+}
+function forgetAudio(id) {
+  if (playing === id) stopAudio();
+  const m = media.get(id);
+  if (m) URL.revokeObjectURL(m.url);
+  media.delete(id);
+  if (audioStoreAvailable) deleteAudio(id).catch(() => {});
+}
+function renderAudioStatus() {
+  const n = media.size,
+    mb = [...media.values()].reduce((a, m) => a + (m.size || 0), 0) / 1e6;
+  $("#audioStatus").hidden = !n;
+  $("#audioStatusText").textContent =
+    `${n} audio file${n === 1 ? "" : "s"} stored (${mb.toFixed(1)} MB).`;
 }
 let importing = false;
 async function importFiles(files) {
@@ -620,7 +693,7 @@ async function importFiles(files) {
 function showImport() {
   modal(
     "Import tracks",
-    `<button class="dropzone" id="pickFiles">Choose audio or CSV files<small>MP3, WAV, M4A or OGG audio, or a CSV of track metadata</small></button><p>Audio is decoded in your browser and never uploaded. BPM, Camelot key and energy are estimated from the first 90 seconds.</p><p>Estimates can be wrong, so check them before you play out. Playback works for files imported in this session; metadata is saved in this browser.</p><p>CSV columns: <b>title, artist, bpm, key, energy, duration, genre</b>. Duration is in seconds.</p>`,
+    `<button class="dropzone" id="pickFiles">Choose audio or CSV files<small>MP3, WAV, M4A or OGG audio, or a CSV of track metadata</small></button><p>Audio is decoded in your browser and never uploaded. BPM, Camelot key and energy are estimated from the first 90 seconds.</p><p>Estimates can be wrong, so check them before you play out. Imported audio is kept in this browser so it still plays after a reload. Delete it any time from the bottom of the page.</p><p>CSV columns: <b>title, artist, bpm, key, energy, duration, genre</b>. Duration is in seconds.</p>`,
   );
   $("#pickFiles").onclick = () => {
     closeModal();
@@ -942,6 +1015,7 @@ $("#restoreInput").onchange = async (e) => {
       render();
       closeModal();
       toast("Backup restored.");
+      restoreStoredAudio();
     };
   } catch (err) {
     toast(err.message);
@@ -972,4 +1046,24 @@ $("#waveform").onclick = (e) => {
     a.currentTime = ((e.clientX - r.left) / r.width) * a.duration;
   }
 };
+$("#clearAudioBtn").onclick = () => {
+  modal(
+    "Delete stored audio?",
+    `<p>This deletes all ${media.size} audio files saved in this browser. Track metadata and sets are kept, but playback and waveforms need the files imported again.</p><button class="btn btn-primary full" id="confirmClearAudio">Delete stored audio</button>`,
+  );
+  $("#confirmClearAudio").onclick = async () => {
+    stopAudio();
+    media.forEach((m) => URL.revokeObjectURL(m.url));
+    media.clear();
+    try {
+      if (audioStoreAvailable) await clearAudio();
+      toast("Stored audio deleted.");
+    } catch {
+      toast("Could not delete stored audio. Try clearing site data.");
+    }
+    closeModal();
+    render();
+  };
+};
 render();
+restoreStoredAudio();

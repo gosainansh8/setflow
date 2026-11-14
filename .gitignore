@@ -1,0 +1,12 @@
+# AI tool files
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+AGENTS.md
+.cursor/
+.cursorrules
+.aider*
+.copilot/
+
+# OS
+.DS_Store

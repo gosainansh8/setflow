@@ -26,7 +26,23 @@ const $ = (s) => document.querySelector(s),
       : Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
           b.toString(16).padStart(2, "0"),
         ).join("");
+// Demo library: real songs I play, ordered roughly warm-up to peak.
+// BPM, Camelot key, energy and duration are my estimates for planning,
+// not measured from audio, and no audio ships with the app.
+const demoVersion = 2;
 const seed = [
+  ["Gal Mitthi Mitthi", "Tochi Raina", 98, "4A", 5, 236, "Bollywood"],
+  ["Lamberghini", "The Doorbeen, Ragini", 96, "6A", 5, 217, "Punjabi"],
+  [
+    "Brown Munde",
+    "AP Dhillon, Gurinder Gill, Shinda Kahlon",
+    97,
+    "7A",
+    5,
+    267,
+    "Punjabi",
+  ],
+  ["Proper Patola", "Diljit Dosanjh, Badshah", 104, "9A", 6, 200, "Punjabi"],
   [
     "Kala Chashma",
     "Amar Arshi, Badshah, Neha Kakkar",
@@ -35,8 +51,27 @@ const seed = [
     6,
     187,
     "Bollywood",
-    "#a86d42",
   ],
+  ["Lungi Dance", "Yo Yo Honey Singh", 105, "9A", 7, 211, "Bollywood"],
+  [
+    "Aaj Ki Raat",
+    "Madhubanti Bagchi, Divya Kumar",
+    110,
+    "8A",
+    5,
+    228,
+    "Bollywood",
+  ],
+  [
+    "Kar Gayi Chull",
+    "Badshah, Fazilpuria, Sukriti Kakar, Neha Kakkar",
+    115,
+    "10A",
+    7,
+    188,
+    "Bollywood",
+  ],
+  ["Ghungroo", "Arijit Singh, Shilpa Rao", 118, "7A", 6, 302, "Bollywood"],
   [
     "Badtameez Dil",
     "Benny Dayal, Shefali Alvares",
@@ -45,27 +80,6 @@ const seed = [
     8,
     253,
     "Bollywood",
-    "#9a4252",
-  ],
-  [
-    "Desi Girl",
-    "Shankar Mahadevan, Sunidhi Chauhan",
-    126,
-    "9B",
-    8,
-    306,
-    "Bollywood",
-    "#af8249",
-  ],
-  [
-    "Dilliwaali Girlfriend",
-    "Arijit Singh, Sunidhi Chauhan",
-    128,
-    "10B",
-    9,
-    260,
-    "Bollywood",
-    "#6c759f",
   ],
   [
     "Balam Pichkari",
@@ -75,29 +89,54 @@ const seed = [
     8,
     289,
     "Bollywood",
-    "#8b5680",
   ],
   [
-    "Ghungroo",
-    "Arijit Singh, Shilpa Rao",
-    118,
-    "7A",
-    6,
-    302,
+    "Jhoome Jo Pathaan",
+    "Arijit Singh, Sukriti Kakar",
+    120,
+    "11A",
+    8,
+    208,
     "Bollywood",
-    "#557b92",
+  ],
+  ["Tauba Tauba", "Karan Aujla", 122, "9A", 7, 207, "Bollywood"],
+  [
+    "London Thumakda",
+    "Labh Janjua, Sonu Kakkar, Neha Kakkar",
+    124,
+    "10A",
+    8,
+    230,
+    "Bollywood",
+  ],
+  ["Nashe Si Chadh Gayi", "Arijit Singh", 124, "8B", 7, 237, "Bollywood"],
+  [
+    "Desi Girl",
+    "Shankar Mahadevan, Sunidhi Chauhan, Vishal Dadlani",
+    126,
+    "9B",
+    8,
+    306,
+    "Bollywood",
   ],
   [
-    "Aaj Ki Raat",
-    "Madhubanti Bagchi, Divya Kumar",
-    110,
-    "8A",
-    5,
-    228,
+    "Sheila Ki Jawani",
+    "Vishal Dadlani, Sunidhi Chauhan",
+    128,
+    "11A",
+    9,
+    284,
     "Bollywood",
-    "#537b54",
   ],
-  ["Tauba Tauba", "Karan Aujla", 122, "9A", 7, 207, "Bollywood", "#a17a4c"],
+  [
+    "Dilliwaali Girlfriend",
+    "Arijit Singh, Sunidhi Chauhan",
+    128,
+    "10B",
+    9,
+    260,
+    "Bollywood",
+  ],
   [
     "Disco Deewane",
     "Benny Dayal, Sunidhi Chauhan",
@@ -106,26 +145,9 @@ const seed = [
     9,
     342,
     "Bollywood",
-    "#8d666d",
   ],
-  [
-    "Nashe Si Chadh Gayi",
-    "Arijit Singh",
-    124,
-    "8B",
-    7,
-    237,
-    "Bollywood",
-    "#4e7d79",
-  ],
-  ["Midnight Motion", "SetFlow Demo", 124, "8A", 6, 270, "House", "#4f6d8b"],
-  ["Afterhours", "SetFlow Demo", 126, "9A", 7, 290, "House", "#795a9c"],
-  ["Neon District", "SetFlow Demo", 128, "10A", 8, 310, "House", "#a28b52"],
-  ["One More Sunrise", "SetFlow Demo", 130, "10B", 9, 240, "House", "#b46856"],
-  ["Low End Theory", "SetFlow Demo", 92, "7A", 4, 195, "Hip-hop", "#66816f"],
-  ["Night Shift", "SetFlow Demo", 100, "8A", 5, 210, "Hip-hop", "#86654f"],
 ].map((t, i) => ({
-  id: "demo-" + i,
+  id: `demo${demoVersion}-${i}`,
   title: t[0],
   artist: t[1],
   bpm: t[2],
@@ -133,7 +155,6 @@ const seed = [
   energy: t[4],
   duration: t[5],
   genre: t[6],
-  color: t[7],
   source: "demo",
 }));
 const storageKey = "setflow-v1";
@@ -169,6 +190,23 @@ try {
       ? stored.shape
       : "build";
     setName = String(stored.setName || setName);
+    if (stored.demoVersion !== demoVersion) {
+      const oldDemo = new Set(
+        tracks.filter((t) => t.source === "demo").map((t) => t.id),
+      );
+      if (oldDemo.size) {
+        tracks = [...seed, ...tracks.filter((t) => !oldDemo.has(t.id))];
+        setIds = setIds.filter((id) => !oldDemo.has(id));
+        saved = saved.map((s) => ({
+          ...s,
+          trackIds: s.trackIds.filter((id) => !oldDemo.has(id)),
+        }));
+      }
+      // Record the new version so edits to demo tracks survive reloads.
+      // Deferred until the module has finished loading, because persist()
+      // can show a toast, which uses state declared further down.
+      queueMicrotask(persist);
+    }
   }
 } catch {
   tracks = seed;
@@ -193,7 +231,7 @@ function persist() {
   try {
     localStorage.setItem(
       storageKey,
-      JSON.stringify({ tracks, saved, setIds, shape, setName }),
+      JSON.stringify({ tracks, saved, setIds, shape, setName, demoVersion }),
     );
     return true;
   } catch {
@@ -215,7 +253,28 @@ function bars(e) {
 function currentSet() {
   return setIds.map((id) => tracks.find((t) => t.id === id)).filter(Boolean);
 }
+const genreChoices = ["Bollywood", "Punjabi", "House", "Hip-hop", "Other"];
+function genres() {
+  return [...new Set(tracks.map((t) => t.genre))].sort();
+}
+function renderGenreControls() {
+  const list = genres();
+  if (filter !== "All" && !list.includes(filter)) filter = "All";
+  $("#genreFilters").innerHTML = ["All", ...list]
+    .map(
+      (g) =>
+        `<button class="chip" data-filter="${esc(g)}" aria-pressed="${g === filter}">${esc(g)}</button>`,
+    )
+    .join("");
+  const select = $("#buildGenre"),
+    current = select.value || "All";
+  select.innerHTML = ["All", ...list]
+    .map((g) => `<option value="${esc(g)}">${esc(g)}</option>`)
+    .join("");
+  select.value = list.includes(current) ? current : "All";
+}
 function renderLibrary() {
+  renderGenreControls();
   const ts = tracks.filter(
     (t) =>
       (filter === "All" || t.genre === filter) &&
@@ -229,11 +288,12 @@ function renderLibrary() {
   $("#trackRows").innerHTML = ts
     .map((t, i) => {
       const inSet = setIds.includes(t.id);
-      return `<tr><td class="num">${i + 1}</td><td class="title" title="${esc(t.title)}">${esc(t.title)}</td><td class="artist" title="${esc(t.artist)}">${esc(t.artist)}</td><td class="num">${t.bpm}</td><td class="mono">${esc(t.key)}</td><td>${bars(t.energy)}</td><td class="num">${duration(t.duration)}</td><td><div class="rowactions">${media.has(t.id) ? `<button class="iconbtn" data-action="play" data-id="${esc(t.id)}" aria-label="Play ${esc(t.title)}" title="Play">▶</button>` : ""}<button class="iconbtn" data-action="edit" data-id="${esc(t.id)}" aria-label="Edit ${esc(t.title)}" title="Edit">✎</button><button class="iconbtn" data-action="add" data-id="${esc(t.id)}" aria-label="${inSet ? `${esc(t.title)} is in the set` : `Add ${esc(t.title)} to set`}" title="${inSet ? "In set" : "Add to set"}"${inSet ? " aria-disabled=\"true\"" : ""}>${inSet ? "✓" : "+"}</button></div></td></tr>`;
+      return `<tr><td class="num">${i + 1}</td><td class="title" title="${esc(t.title)}">${esc(t.title)}${t.source === "demo" ? '<span class="tag" title="Demo metadata, no audio">demo</span>' : ""}</td><td class="artist" title="${esc(t.artist)}">${esc(t.artist)}</td><td class="num">${t.bpm}</td><td class="mono">${esc(t.key)}</td><td>${bars(t.energy)}</td><td class="num">${duration(t.duration)}</td><td><div class="rowactions">${media.has(t.id) ? `<button class="iconbtn" data-action="play" data-id="${esc(t.id)}" aria-label="Play ${esc(t.title)}" title="Play">▶</button>` : ""}<button class="iconbtn" data-action="edit" data-id="${esc(t.id)}" aria-label="Edit ${esc(t.title)}" title="Edit">✎</button><button class="iconbtn" data-action="add" data-id="${esc(t.id)}" aria-label="${inSet ? `${esc(t.title)} is in the set` : `Add ${esc(t.title)} to set`}" title="${inSet ? "In set" : "Add to set"}"${inSet ? ' aria-disabled="true"' : ""}>${inSet ? "✓" : "+"}</button></div></td></tr>`;
     })
     .join("");
   $("#emptyLibrary").hidden = !!ts.length;
   $("#showing").textContent = `Showing ${ts.length} of ${tracks.length} tracks`;
+  $("#demoNote").hidden = !tracks.some((t) => t.source === "demo");
   $("#libraryCount").textContent = tracks.length;
   $("#savedCount").textContent = saved.length;
   $("#sortTitle").setAttribute(
@@ -339,7 +399,7 @@ function editTrack(id) {
   };
   modal(
     id ? "Edit track" : "Add track",
-    `<form id="trackForm"><label>Track title<input name="title" value="${esc(t.title)}" required maxlength="160"></label><label>Artist<input name="artist" value="${esc(t.artist)}" maxlength="160"></label><div class="formgrid"><label>BPM<input name="bpm" type="number" min="40" max="240" step=".1" value="${t.bpm}" required></label><label>Camelot key<select name="key">${Array.from({ length: 12 }, (_, i) => ["A", "B"].map((m) => `<option ${t.key === `${i + 1}${m}` ? "selected" : ""}>${i + 1}${m}</option>`).join("")).join("")}</select></label><label>Energy (1 to 10)<input name="energy" type="number" min="1" max="10" value="${t.energy}" required></label><label>Duration (seconds)<input name="duration" type="number" min="1" max="7200" value="${t.duration}" required></label></div><label>Genre<select name="genre">${["Bollywood", "House", "Hip-hop", "Other"].map((g) => `<option ${g === t.genre ? "selected" : ""}>${g}</option>`).join("")}</select></label><div class="formerror" id="formError"></div><button class="btn btn-primary full" type="submit">${id ? "Save changes" : "Add track"}</button>${id ? '<button class="btn btn-quiet full" type="button" id="deleteTrack">Remove from library</button>' : ""}<p>${t.source === "demo" ? "Demo metadata only, no audio. Adjust it to match your version of the track." : t.source === "audio" ? "Analyzed from audio. Check BPM, key and energy by ear before you play out." : "Copy the values from your DJ software or enter your own."}</p></form>`,
+    `<form id="trackForm"><label>Track title<input name="title" value="${esc(t.title)}" required maxlength="160"></label><label>Artist<input name="artist" value="${esc(t.artist)}" maxlength="160"></label><div class="formgrid"><label>BPM<input name="bpm" type="number" min="40" max="240" step=".1" value="${t.bpm}" required></label><label>Camelot key<select name="key">${Array.from({ length: 12 }, (_, i) => ["A", "B"].map((m) => `<option ${t.key === `${i + 1}${m}` ? "selected" : ""}>${i + 1}${m}</option>`).join("")).join("")}</select></label><label>Energy (1 to 10)<input name="energy" type="number" min="1" max="10" value="${t.energy}" required></label><label>Duration (seconds)<input name="duration" type="number" min="1" max="7200" value="${t.duration}" required></label></div><label>Genre<select name="genre">${[...new Set([...genreChoices, t.genre])].map((g) => `<option ${g === t.genre ? "selected" : ""}>${g}</option>`).join("")}</select></label><div class="formerror" id="formError"></div><button class="btn btn-primary full" type="submit">${id ? "Save changes" : "Add track"}</button>${id ? '<button class="btn btn-quiet full" type="button" id="deleteTrack">Remove from library</button>' : ""}<p>${t.source === "demo" ? "Demo metadata only, no audio. Adjust it to match your version of the track." : t.source === "audio" ? "Analyzed from audio. Check BPM, key and energy by ear before you play out." : "Copy the values from your DJ software or enter your own."}</p></form>`,
   );
   $("#trackForm").onsubmit = (e) => {
     e.preventDefault();
@@ -618,16 +678,12 @@ $("#modal").onclick = (e) => {
 $("#addBtn").onclick = () => editTrack();
 $("#importBtn").onclick = showImport;
 $("#fileInput").onchange = (e) => importFiles(e.target.files);
-$$("[data-filter]").forEach(
-  (b) =>
-    (b.onclick = () => {
-      filter = b.dataset.filter;
-      $$("[data-filter]").forEach((x) =>
-        x.setAttribute("aria-pressed", String(x === b)),
-      );
-      renderLibrary();
-    }),
-);
+$("#genreFilters").onclick = (e) => {
+  const b = e.target.closest("[data-filter]");
+  if (!b) return;
+  filter = b.dataset.filter;
+  renderLibrary();
+};
 $("#searchInput").oninput = (e) => {
   query = e.target.value;
   renderLibrary();
@@ -730,7 +786,9 @@ $("#setList").ondragstart = (e) => {
 $("#setList").ondragover = (e) => {
   e.preventDefault();
   const row = e.target.closest("[data-index]");
-  $$(".drop-target").forEach((x) => x !== row && x.classList.remove("drop-target"));
+  $$(".drop-target").forEach(
+    (x) => x !== row && x.classList.remove("drop-target"),
+  );
   if (row && +row.dataset.index !== dragged) row.classList.add("drop-target");
 };
 $("#setList").ondrop = (e) => {
@@ -808,7 +866,7 @@ $("#templateBtn").onclick = () =>
         key: "8A",
         energy: 7,
         duration: 240,
-        genre: "House",
+        genre: "Bollywood",
       },
     ]),
   );

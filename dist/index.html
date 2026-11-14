@@ -43,21 +43,17 @@
                 id="searchInput"
                 type="search"
                 placeholder="Search title or artist"
-                autocomplete="off" /><kbd>/</kbd></label
+                autocomplete="off"
+              /><kbd>/</kbd></label
             >
           </div>
           <div class="toolbar">
-            <div class="filters" role="group" aria-label="Genre filter">
-              <button class="chip" data-filter="All" aria-pressed="true">
-                All</button
-              ><button class="chip" data-filter="Bollywood" aria-pressed="false">
-                Bollywood</button
-              ><button class="chip" data-filter="House" aria-pressed="false">
-                House</button
-              ><button class="chip" data-filter="Hip-hop" aria-pressed="false">
-                Hip-hop
-              </button>
-            </div>
+            <div
+              class="filters"
+              id="genreFilters"
+              role="group"
+              aria-label="Genre filter"
+            ></div>
             <button class="link" id="templateBtn">CSV template</button>
           </div>
           <div class="tablewrap">
@@ -84,7 +80,10 @@
           </div>
           <div class="pane-foot">
             <span id="showing"></span
-            ><span>Demo tracks are metadata only, with no audio.</span>
+            ><span id="demoNote"
+              >Tracks tagged demo are metadata only (my estimates), with no
+              audio.</span
+            >
           </div>
         </section>
         <section class="pane set" aria-labelledby="setHeading">
@@ -109,12 +108,7 @@
             /></label>
             <label class="field"
               >Tracks <output class="mono" id="countOutput">8</output
-              ><input
-                id="trackCount"
-                type="range"
-                min="2"
-                max="20"
-                value="8"
+              ><input id="trackCount" type="range" min="2" max="20" value="8"
             /></label>
             <label class="field"
               >Energy profile<select id="shape">
@@ -123,23 +117,15 @@
                 <option value="steady">Steady</option>
               </select></label
             >
-            <label class="field"
-              >Genre<select id="buildGenre">
-                <option value="All">All</option>
-                <option>Bollywood</option>
-                <option>House</option>
-                <option>Hip-hop</option>
-                <option>Other</option>
-              </select></label
-            >
+            <label class="field">Genre<select id="buildGenre"></select></label>
             <button class="btn btn-primary" id="generateBtn">Generate</button>
           </div>
           <figure class="curve">
             <figcaption>
               <span>Energy</span
               ><span class="legend"
-                ><i class="swatch actual"></i>Set <i class="swatch target"></i
-                >Target</span
+                ><i class="swatch actual"></i>Set
+                <i class="swatch target"></i>Target</span
               >
             </figcaption>
             <svg

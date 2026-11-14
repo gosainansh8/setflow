@@ -119,3 +119,93 @@ export function validateTrack(t) {
         : undefined,
   };
 }
+
+// Musical key to Camelot. Rekordbox exports either notation depending on
+// its "Key display format" setting, e.g. Tonality="8A" or Tonality="Am".
+const PITCH = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 },
+  CAMELOT_MAJOR = [8, 3, 10, 5, 12, 7, 2, 9, 4, 11, 6, 1],
+  CAMELOT_MINOR = [5, 12, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10];
+export function normalizeKey(value) {
+  const s = String(value ?? "").trim();
+  const camelot = /^0?([1-9]|1[0-2])\s*([AB])$/i.exec(s);
+  if (camelot) return camelot[1] + camelot[2].toUpperCase();
+  const musical = /^([A-G])\s*([#♯b♭]?)\s*(m|min|minor|maj|major)?$/i.exec(s);
+  if (!musical) return s.toUpperCase();
+  const letter = musical[1].toUpperCase(),
+    accidental = musical[2],
+    quality = musical[3] || "",
+    // Lowercase "m" alone means minor (capital "M" is major shorthand);
+    // spelled-out "min" or "minor" is minor in any case.
+    minor = quality === "m" || /^(min|minor)$/i.test(quality),
+    shift = /[#♯]/.test(accidental) ? 1 : /[b♭]/.test(accidental) ? -1 : 0,
+    pitch = (PITCH[letter] + shift + 12) % 12;
+  return minor ? `${CAMELOT_MINOR[pitch]}A` : `${CAMELOT_MAJOR[pitch]}B`;
+}
+
+function decodeXml(s) {
+  return s.replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (_, e) => {
+    const k = e.toLowerCase();
+    if (k[0] === "#")
+      return String.fromCodePoint(
+        k[1] === "x" ? parseInt(k.slice(2), 16) : parseInt(k.slice(1), 10),
+      );
+    return { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" }[k];
+  });
+}
+function xmlAttributes(source) {
+  const attrs = {};
+  for (const m of source.matchAll(/([\w:.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g))
+    attrs[m[1]] = decodeXml(m[2] ?? m[3]);
+  return attrs;
+}
+export const REKORDBOX_LIMIT = 5000;
+// Parses a Rekordbox library export (File > Export Collection in xml
+// format). Only <TRACK> elements inside <COLLECTION> are tracks; the ones
+// under <PLAYLISTS> are references by id and are ignored. Tracks that
+// Rekordbox never analyzed (no BPM or key) are skipped with a reason
+// instead of failing the whole file. Rekordbox has no energy field, so
+// energy defaults to 5.
+export function parseRekordboxXML(text) {
+  const xml = String(text);
+  if (!/<DJ_PLAYLISTS[\s>]/.test(xml))
+    throw Error("Not a Rekordbox XML export (no DJ_PLAYLISTS element).");
+  const collection = /<COLLECTION\b[^>]*>([\s\S]*?)<\/COLLECTION>/.exec(xml);
+  if (!collection) throw Error("Rekordbox XML has no COLLECTION of tracks.");
+  const elements = [...collection[1].matchAll(/<TRACK\b([^>]*?)\/?>/g)];
+  if (!elements.length) throw Error("Rekordbox XML has no tracks.");
+  if (elements.length > REKORDBOX_LIMIT)
+    throw Error(
+      `Import up to ${REKORDBOX_LIMIT.toLocaleString("en-US")} tracks at a time.`,
+    );
+  const tracks = [],
+    skipped = [];
+  elements.forEach((m, i) => {
+    const a = xmlAttributes(m[1]),
+      title = (a.Name || "").trim(),
+      label = title || `Track ${a.TrackID || i + 1}`,
+      bpm = parseFloat(a.AverageBpm),
+      duration = parseInt(a.TotalTime, 10);
+    let reason = "";
+    if (!title) reason = "no title";
+    else if (!(bpm > 0)) reason = "no BPM (not analyzed in Rekordbox)";
+    else if (!a.Tonality?.trim()) reason = "no key (not analyzed in Rekordbox)";
+    else if (!(duration > 0)) reason = "no duration";
+    if (reason) return skipped.push({ title: label, reason });
+    try {
+      tracks.push(
+        validateTrack({
+          title,
+          artist: (a.Artist || "").trim() || "Unknown artist",
+          genre: (a.Genre || "").trim() || "Other",
+          bpm: Math.round(bpm * 10) / 10,
+          key: normalizeKey(a.Tonality),
+          energy: 5,
+          duration,
+        }),
+      );
+    } catch (e) {
+      skipped.push({ title: label, reason: e.message });
+    }
+  });
+  return { tracks, skipped };
+}

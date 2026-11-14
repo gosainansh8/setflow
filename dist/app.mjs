@@ -6,6 +6,8 @@ import {
   csvCell,
   validateTrack,
   keyIsUncertain,
+  normalizeKey,
+  parseRekordboxXML,
 } from "./core.mjs";
 import {
   audioStoreAvailable,
@@ -510,7 +512,7 @@ async function importCSV(file) {
     try {
       return validateTrack({
         ...t,
-        key: t.key.toUpperCase(),
+        key: normalizeKey(t.key),
         id: uid(),
         source: "csv",
       });
@@ -521,6 +523,35 @@ async function importCSV(file) {
   tracks.push(...batch);
   persist();
   render();
+  return batch.length;
+}
+async function importRekordbox(file, notes) {
+  if (file.size > 50 * 1024 * 1024)
+    throw Error("Rekordbox XML must be under 50 MB.");
+  const { tracks: found, skipped } = parseRekordboxXML(await file.text());
+  // Re-importing the same export should not duplicate the library.
+  const have = new Set(
+    tracks.map((t) => `${t.title}\u0000${t.artist}`.toLowerCase()),
+  );
+  const batch = [];
+  for (const t of found) {
+    const k = `${t.title}\u0000${t.artist}`.toLowerCase();
+    if (have.has(k)) {
+      skipped.push({ title: t.title, reason: "already in the library" });
+      continue;
+    }
+    have.add(k);
+    batch.push({ ...t, id: uid(), source: "rekordbox" });
+  }
+  tracks.push(...batch);
+  persist();
+  render();
+  for (const s of skipped)
+    notes.push(`${file.name}: skipped "${s.title}", ${s.reason}`);
+  if (batch.length)
+    notes.push(
+      `${file.name}: energy is not in Rekordbox exports, so imported tracks start at 5. Adjust them in the library.`,
+    );
   return batch.length;
 }
 async function importAudio(file) {
@@ -667,13 +698,17 @@ async function importFiles(files) {
   importing = true;
   $("#importBtn").disabled = true;
   let added = 0,
-    errors = [];
+    errors = [],
+    notes = [];
   for (let i = 0; i < list.length; i++) {
     toast(`Importing ${i + 1}/${list.length}: ${list[i].name}`);
     try {
-      added += list[i].name.toLowerCase().endsWith(".csv")
+      const name = list[i].name.toLowerCase();
+      added += name.endsWith(".csv")
         ? await importCSV(list[i])
-        : await importAudio(list[i]);
+        : name.endsWith(".xml")
+          ? await importRekordbox(list[i], notes)
+          : await importAudio(list[i]);
     } catch (e) {
       errors.push(`${list[i].name}: ${e.message}`);
     }
@@ -684,16 +719,22 @@ async function importFiles(files) {
   toast(
     `${added} track${added === 1 ? "" : "s"} imported${errors.length ? `, ${errors.length} failed` : "."}`,
   );
-  if (errors.length)
+  if (errors.length || notes.length) {
+    const shown = [...errors, ...notes],
+      more = shown.length - 50;
     modal(
       "Import report",
-      `<p>${added} tracks imported.</p><ul>${errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>`,
+      `<p>${added} tracks imported.</p><ul>${shown
+        .slice(0, 50)
+        .map((e) => `<li>${esc(e)}</li>`)
+        .join("")}${more > 0 ? `<li>and ${more} more</li>` : ""}</ul>`,
     );
+  }
 }
 function showImport() {
   modal(
     "Import tracks",
-    `<button class="dropzone" id="pickFiles">Choose audio or CSV files<small>MP3, WAV, M4A or OGG audio, or a CSV of track metadata</small></button><p>Audio is decoded in your browser and never uploaded. BPM, Camelot key and energy are estimated from the first 90 seconds.</p><p>Estimates can be wrong, so check them before you play out. Imported audio is kept in this browser so it still plays after a reload. Delete it any time from the bottom of the page.</p><p>CSV columns: <b>title, artist, bpm, key, energy, duration, genre</b>. Duration is in seconds.</p>`,
+    `<button class="dropzone" id="pickFiles">Choose audio, CSV or Rekordbox XML files<small>MP3, WAV, M4A or OGG audio, a CSV of track metadata, or a Rekordbox collection export</small></button><p>Audio is decoded in your browser and never uploaded. BPM, Camelot key and energy are estimated from the first 90 seconds.</p><p>Estimates can be wrong, so check them before you play out. Imported audio is kept in this browser so it still plays after a reload. Delete it any time from the bottom of the page.</p><p>CSV columns: <b>title, artist, bpm, key, energy, duration, genre</b>. Duration is in seconds. Keys can be Camelot (8A) or musical (Am).</p><p>Rekordbox: File, Export Collection in xml format. Title, artist, genre, BPM, key and duration are imported; tracks Rekordbox has not analyzed are skipped.</p>`,
   );
   $("#pickFiles").onclick = () => {
     closeModal();

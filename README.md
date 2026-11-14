@@ -4,9 +4,7 @@ I DJ Bollywood sets, and planning the order of tracks by hand meant juggling tem
 
 **Live demo: https://gosainansh8.github.io/setflow/** (runs entirely in your browser; nothing is uploaded)
 
-<!-- Set builder screenshot: save it as docs/set-builder.png, then uncomment.
-![SetFlow library and set builder](docs/set-builder.png)
--->
+![SetFlow library and set builder with a generated 8-track set](docs/set-builder.png)
 
 ## How to use it
 

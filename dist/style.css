@@ -34,6 +34,7 @@
   --text: #e8ebe9;
   --text-muted: #a4aca8;
   --accent: #93d96f;
+  --accent-hover: #aee68f;
   --on-accent: #0f1110;
   --warn: #e6b062;
   --danger: #ff9e8c;
@@ -155,6 +156,64 @@ label {
   display: block;
   font-size: var(--text-xs);
   color: var(--text-muted);
+}
+
+/*
+  Interaction states. Hover changes the surface and border so the target is
+  obvious; pressing darkens it; keyboard focus always gets the accent ring.
+  No transitions or animations: state changes are immediate.
+*/
+.btn:hover:not(:disabled),
+.iconbtn:hover:not([aria-disabled="true"]) {
+  background: var(--line);
+  border-color: var(--text-muted);
+  color: var(--text);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--on-accent);
+}
+.btn-quiet:hover:not(:disabled) {
+  border-color: transparent;
+}
+.btn:active:not(:disabled),
+.iconbtn:active:not([aria-disabled="true"]) {
+  background: var(--bg);
+}
+.btn-primary:active:not(:disabled) {
+  background: var(--accent);
+}
+.iconbtn[aria-disabled="true"] {
+  cursor: default;
+  color: var(--accent);
+}
+.tab:hover,
+.chip:hover,
+.link:hover,
+th .sort:hover {
+  color: var(--text);
+}
+.chip:hover {
+  border-color: var(--control-border);
+}
+input:hover,
+select:hover {
+  border-color: var(--text-muted);
+}
+input:focus,
+select:focus {
+  border-color: var(--accent);
+}
+tbody tr:hover td,
+.setrow:hover .setrow-main {
+  background: var(--surface-2);
+}
+.setrow.dragging {
+  opacity: 0.5;
+}
+.setrow.drop-target .setrow-main {
+  box-shadow: inset 0 2px 0 var(--accent);
 }
 
 /* App bar */

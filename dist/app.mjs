@@ -702,22 +702,37 @@ $("#setList").onclick = (e) => {
       j = i + +m.dataset.step;
     if (j < 0 || j >= setIds.length) return;
     [setIds[i], setIds[j]] = [setIds[j], setIds[i]];
-  } else if (r) setIds.splice(+r.dataset.remove, 1);
-  else return;
-  persist();
-  renderSet();
-  renderLibrary();
+    persist();
+    renderSet();
+    // Re-rendering replaces the buttons, so put focus back on the same
+    // control in the moved row. Keyboard users can keep pressing Enter.
+    $(`[data-move="${j}"][data-step="${m.dataset.step}"]`)?.focus();
+  } else if (r) {
+    const i = +r.dataset.remove;
+    setIds.splice(i, 1);
+    persist();
+    renderSet();
+    renderLibrary();
+    const next = $(`[data-remove="${Math.min(i, setIds.length - 1)}"]`);
+    (next || $("#generateBtn")).focus();
+  }
 };
 let dragged = null;
 $("#setList").ondragstart = (e) => {
   const row = e.target.closest("[data-index]");
   if (row) {
     dragged = +row.dataset.index;
+    row.classList.add("dragging");
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", String(dragged));
   }
 };
-$("#setList").ondragover = (e) => e.preventDefault();
+$("#setList").ondragover = (e) => {
+  e.preventDefault();
+  const row = e.target.closest("[data-index]");
+  $$(".drop-target").forEach((x) => x !== row && x.classList.remove("drop-target"));
+  if (row && +row.dataset.index !== dragged) row.classList.add("drop-target");
+};
 $("#setList").ondrop = (e) => {
   e.preventDefault();
   const row = e.target.closest("[data-index]");
@@ -729,7 +744,12 @@ $("#setList").ondrop = (e) => {
   }
   dragged = null;
 };
-$("#setList").ondragend = () => (dragged = null);
+$("#setList").ondragend = () => {
+  dragged = null;
+  $$(".dragging, .drop-target").forEach((x) =>
+    x.classList.remove("dragging", "drop-target"),
+  );
+};
 $("#saveSetBtn").onclick = () => {
   if (!setIds.length) return toast("Add tracks before saving your set.");
   const name = setName.trim() || "Untitled set";

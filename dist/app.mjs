@@ -179,11 +179,10 @@ let filter = "All",
   query = "",
   sort = "",
   dir = 1,
-  view = "library",
+  view = "plan",
   playing = null;
 const media = new Map();
 let toastTimer;
-const colors = ["#a86d42", "#6c759f", "#537b54", "#795a9c", "#4e7d79"];
 function toast(msg) {
   $("#toast").textContent = msg;
   $("#toast").classList.add("show");
@@ -210,15 +209,8 @@ function totalTime(sec) {
     ? `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`
     : `${Math.floor(sec / 60)}m`;
 }
-function cover(t) {
-  const color = /^#[0-9a-f]{6}$/i.test(t.color) ? t.color : "#537b54";
-  return `<div class="cover" style="--c:${color}">${esc(t.title[0])}</div>`;
-}
 function bars(e) {
   return `<div class="energy" aria-label="Energy ${e} of 10">${Array.from({ length: 10 }, (_, i) => `<i class="${i < e ? "on" : ""}"></i>`).join("")}<span>${e}</span></div>`;
-}
-function keyBadge(t) {
-  return `<span class="keybadge ${t.key.endsWith("B") ? "b" : ""}">${esc(t.key)}</span>`;
 }
 function currentSet() {
   return setIds.map((id) => tracks.find((t) => t.id === id)).filter(Boolean);
@@ -235,81 +227,81 @@ function renderLibrary() {
         dir * (sort === "bpm" ? a.bpm - b.bpm : a.title.localeCompare(b.title)),
     );
   $("#trackRows").innerHTML = ts
-    .map(
-      (t, i) =>
-        `<tr><td>${String(i + 1).padStart(2, "0")}</td><td><div class="trackcell">${cover(t)}<div><span class="tracktitle">${esc(t.title)}</span><span class="trackartist">${esc(t.artist)}</span></div></div></td><td>${t.bpm}</td><td>${keyBadge(t)}</td><td>${bars(t.energy)}</td><td>${duration(t.duration)}</td><td><div class="rowactions">${media.has(t.id) ? `<button class="iconbtn" data-action="play" data-id="${esc(t.id)}" aria-label="Play ${esc(t.title)}">▷</button>` : ""}<button class="iconbtn" data-action="edit" data-id="${esc(t.id)}" aria-label="Edit ${esc(t.title)}">⋯</button><button class="iconbtn" data-action="add" data-id="${esc(t.id)}" aria-label="Add ${esc(t.title)} to set">${setIds.includes(t.id) ? "✓" : "＋"}</button></div></td></tr>`,
-    )
+    .map((t, i) => {
+      const inSet = setIds.includes(t.id);
+      return `<tr><td class="num">${i + 1}</td><td class="title" title="${esc(t.title)}">${esc(t.title)}</td><td class="artist" title="${esc(t.artist)}">${esc(t.artist)}</td><td class="num">${t.bpm}</td><td class="mono">${esc(t.key)}</td><td>${bars(t.energy)}</td><td class="num">${duration(t.duration)}</td><td><div class="rowactions">${media.has(t.id) ? `<button class="iconbtn" data-action="play" data-id="${esc(t.id)}" aria-label="Play ${esc(t.title)}" title="Play">▶</button>` : ""}<button class="iconbtn" data-action="edit" data-id="${esc(t.id)}" aria-label="Edit ${esc(t.title)}" title="Edit">✎</button><button class="iconbtn" data-action="add" data-id="${esc(t.id)}" aria-label="${inSet ? `${esc(t.title)} is in the set` : `Add ${esc(t.title)} to set`}" title="${inSet ? "In set" : "Add to set"}"${inSet ? " aria-disabled=\"true\"" : ""}>${inSet ? "✓" : "+"}</button></div></td></tr>`;
+    })
     .join("");
   $("#emptyLibrary").hidden = !!ts.length;
   $("#showing").textContent = `Showing ${ts.length} of ${tracks.length} tracks`;
-  $("#statTracks").textContent = String(tracks.length).padStart(2, "0");
-  $("#crateCount").textContent = tracks.length;
-  $("#navCount").textContent = tracks.length;
+  $("#libraryCount").textContent = tracks.length;
   $("#savedCount").textContent = saved.length;
-  $("#statTime").textContent = totalTime(
-    tracks.reduce((s, t) => s + t.duration, 0),
+  $("#sortTitle").setAttribute(
+    "aria-sort",
+    sort === "title" ? (dir > 0 ? "ascending" : "descending") : "none",
   );
-  $("#statBpm").textContent = tracks.length
-    ? `${Math.min(...tracks.map((t) => t.bpm))}–${Math.max(...tracks.map((t) => t.bpm))}`
-    : "—";
-  $("#statGenres").textContent =
-    `${new Set(tracks.map((t) => t.genre)).size} genres · Endless possibilities`;
-  $("#statCollection").textContent = filter === "All" ? "Open format" : filter;
-  $("#statSource").textContent = tracks.some((t) => t.source === "demo")
-    ? "Includes demo metadata"
-    : "Your personal collection";
+  $("#sortBpm").setAttribute(
+    "aria-sort",
+    sort === "bpm" ? (dir > 0 ? "ascending" : "descending") : "none",
+  );
 }
 function renderSet() {
   const list = currentSet();
   $("#setList").innerHTML = list
     .map((t, i) => {
       const prev = list[i - 1],
-        score = prev ? transition(prev, t) : null;
-      return `${prev ? `<div class="transition ${score < 65 ? "warn" : ""}"><span>${score >= 80 ? "↗ Smooth blend" : score >= 65 ? "→ Room to mix" : "↳ Creative transition"} · ${score}/100 &nbsp; / &nbsp; ${t.bpm - prev.bpm >= 0 ? "+" : ""}${t.bpm - prev.bpm} BPM · ${esc(prev.key)} → ${esc(t.key)}</span></div>` : ""}<div class="setrow" draggable="true" data-index="${i}"><span class="setnum">${String(i + 1).padStart(2, "0")}</span>${cover(t)}<div class="trackinfo"><span class="tracktitle">${esc(t.title)}</span><span class="trackartist">${esc(t.artist)} · ${t.bpm} BPM · E${t.energy}</span></div>${keyBadge(t)}<div class="rowactions"><button class="iconbtn" data-move="${i}" data-step="-1" aria-label="Move ${esc(t.title)} up">↑</button><button class="iconbtn" data-move="${i}" data-step="1" aria-label="Move ${esc(t.title)} down">↓</button><button class="iconbtn" data-remove="${i}" aria-label="Remove ${esc(t.title)} from set">×</button></div></div>`;
+        score = prev ? transition(prev, t) : null,
+        grade = score >= 80 ? "good" : score >= 65 ? "ok" : "poor",
+        delta = prev ? t.bpm - prev.bpm : 0;
+      return `<li class="setrow" draggable="true" data-index="${i}">${prev ? `<div class="transition ${grade}" title="Transition score out of 100"><span class="score">${score}</span><span>${delta >= 0 ? "+" : ""}${delta} BPM</span><span>${esc(prev.key)} → ${esc(t.key)}</span></div>` : ""}<div class="setrow-main"><span class="pos mono">${i + 1}</span><span class="who"><strong>${esc(t.title)}</strong><span>${esc(t.artist)}</span></span><span class="mono">${t.bpm}</span><span class="mono">${esc(t.key)}</span><div class="rowactions"><button class="iconbtn" data-move="${i}" data-step="-1" aria-label="Move ${esc(t.title)} up">↑</button><button class="iconbtn" data-move="${i}" data-step="1" aria-label="Move ${esc(t.title)} down">↓</button><button class="iconbtn" data-remove="${i}" aria-label="Remove ${esc(t.title)} from set">×</button></div></div></li>`;
     })
     .join("");
   $("#setEmpty").hidden = !!list.length;
-  $("#setTrackCount").textContent = `${list.length} TRACKS`;
-  $("#setDuration").textContent = list.length
-    ? totalTime(list.reduce((s, t) => s + t.duration, 0))
-    : "—";
+  $("#setTrackCount").textContent = list.length;
+  $("#setDuration").textContent = totalTime(
+    list.reduce((s, t) => s + t.duration, 0),
+  );
   $("#setScore").textContent =
     list.length > 1
       ? Math.round(
           list.slice(1).reduce((s, t, i) => s + transition(list[i], t), 0) /
             (list.length - 1),
-        ) + " / 100"
-      : "—";
+        )
+      : "-";
   $("#setName").value = setName;
   $("#shape").value = shape;
   drawCurve();
 }
 function drawCurve() {
   const list = currentSet(),
-    x = (i) => 20 + (i * 760) / Math.max(1, list.length - 1),
-    y = (e) => 150 - e * 13;
+    x = (i) => 24 + (i * 368) / Math.max(1, list.length - 1),
+    y = (e) => 112 - e * 10;
   const path = list
     .map((t, i) => `${i ? "L" : "M"}${x(i)},${y(t.energy)}`)
     .join(" ");
   const target = Array.from(
     { length: 41 },
     (_, i) =>
-      `${i ? "L" : "M"}${20 + i * 19},${y(targetEnergy(i / 40, shape))}`,
+      `${i ? "L" : "M"}${24 + i * 9.2},${y(targetEnergy(i / 40, shape))}`,
   ).join(" ");
   $("#curve").innerHTML =
-    `${[2, 4, 6, 8, 10].map((e) => `<line x1="15" y1="${y(e)}" x2="790" y2="${y(e)}" stroke="#34412e" stroke-width=".7"/><text x="0" y="${y(e) + 3}" fill="#718669" font-size="9">${e}</text>`).join("")}<path d="${target}" fill="none" stroke="#607a50" stroke-dasharray="5 7" stroke-width="2"/>${list.length ? `<defs><linearGradient id="curveFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cdf994" stop-opacity=".22"/><stop offset="1" stop-color="#cdf994" stop-opacity="0"/></linearGradient></defs><path d="${path} L${x(list.length - 1)},150 L20,150 Z" fill="url(#curveFill)"/><path d="${path}" fill="none" stroke="#cdf994" stroke-width="2.5"/>${list.map((t, i) => `<circle cx="${x(i)}" cy="${y(t.energy)}" r="4" fill="#cdf994"><title>${esc(t.title)} · Energy ${t.energy}</title></circle>`).join("")}` : ""}`;
+    `${[2, 4, 6, 8, 10].map((e) => `<line class="grid" x1="24" y1="${y(e)}" x2="392" y2="${y(e)}"/><text class="axis" x="0" y="${y(e) + 4}">${e}</text>`).join("")}<path class="target" d="${target}"/>${list.length ? `<path class="actual" d="${path}"/>${list.map((t, i) => `<circle cx="${x(i)}" cy="${y(t.energy)}" r="3.5"><title>${i + 1}. ${esc(t.title)}, energy ${t.energy}</title></circle>`).join("")}` : ""}`;
 }
+const profileNames = {
+  build: "Build",
+  peak: "Rise & release",
+  steady: "Steady",
+};
 function renderSaved() {
-  $("#savedGrid").innerHTML = saved.length
-    ? saved
-        .map((s) => {
-          const ts = s.trackIds
-            .map((id) => tracks.find((t) => t.id === id))
-            .filter(Boolean);
-          return `<article class="savedcard"><div class="savedart">${ts.map((t) => `<i style="height:${t.energy * 9}px"></i>`).join("")}</div><div class="eyebrow">${ts.length} TRACKS · ${totalTime(ts.reduce((a, t) => a + t.duration, 0))}</div><h3>${esc(s.name)}</h3><p>${new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} · ${esc({ build: "Gradual build", peak: "Rise & release", steady: "Keep it rolling" }[s.shape] || "Custom flow")}</p><button class="btn" data-open="${esc(s.id)}">Open set ↗</button><button class="textbtn" data-delete-set="${esc(s.id)}">Delete</button></article>`;
-        })
-        .join("")
-    : '<div class="empty">Your saved sets will live here.<br>Build a sequence, then hit Save set.</div>';
+  $("#savedRows").innerHTML = saved
+    .map((s) => {
+      const ts = s.trackIds
+        .map((id) => tracks.find((t) => t.id === id))
+        .filter(Boolean);
+      return `<tr><td class="title">${esc(s.name)}</td><td class="num">${ts.length}</td><td class="num">${totalTime(ts.reduce((a, t) => a + t.duration, 0))}</td><td>${esc(profileNames[s.shape] || "Custom")}</td><td class="mono">${esc(new Date(s.date).toISOString().slice(0, 10))}</td><td><div class="rowactions"><button class="btn" data-open="${esc(s.id)}">Open</button><button class="btn btn-quiet" data-delete-set="${esc(s.id)}">Delete</button></div></td></tr>`;
+    })
+    .join("");
+  $("#savedEmpty").hidden = !!saved.length;
 }
 function render() {
   renderLibrary();
@@ -318,25 +310,13 @@ function render() {
 }
 function navigate(v) {
   view = v;
-  ["library", "builder", "saved"].forEach(
-    (k) => ($("#" + k + "View").hidden = k !== v),
+  $("#planView").hidden = v !== "plan";
+  $("#savedView").hidden = v !== "saved";
+  $$(".tab").forEach((b) =>
+    b.dataset.view === v
+      ? b.setAttribute("aria-current", "page")
+      : b.removeAttribute("aria-current"),
   );
-  $$(".nav").forEach((b) => b.classList.toggle("active", b.dataset.view === v));
-  $("#crumb").textContent = {
-    library: "Track library",
-    builder: "Set builder",
-    saved: "Saved sets",
-  }[v];
-  $("#pageTitle").innerHTML = {
-    library: "Find your flow<span>.</span>",
-    builder: "Build the moment<span>.</span>",
-    saved: "Keep the good ones<span>.</span>",
-  }[v];
-  $("#pageSubtitle").textContent = {
-    library: "Your tracks, in harmony. Build a set that moves the room.",
-    builder: "Every transition tells a story. Make yours worth following.",
-    saved: "Your favorite sequences, ready for the next room.",
-  }[v];
   render();
 }
 function modal(title, html) {
@@ -369,7 +349,6 @@ function editTrack(id) {
         ...t,
         ...input,
         id: id || uid(),
-        color: t.color || colors[tracks.length % colors.length],
         source: t.source || "manual",
       });
       if (id) tracks = tracks.map((x) => (x.id === id ? next : x));
@@ -452,7 +431,6 @@ async function importCSV(file) {
         key: t.key.toUpperCase(),
         id: uid(),
         source: "csv",
-        color: colors[i % colors.length],
       });
     } catch (e) {
       throw Error(`Row ${i + 2}: ${e.message}`);
@@ -528,7 +506,6 @@ async function importAudio(file) {
       energy: result.energy,
       duration: Math.max(1, Math.round(buffer.duration)),
       source: "audio",
-      color: colors[tracks.length % colors.length],
       wave: result.wave,
     });
   tracks.push(t);
@@ -622,11 +599,9 @@ function how() {
 $$("[data-view]").forEach((b) => (b.onclick = () => navigate(b.dataset.view)));
 $(".brand").onclick = (e) => {
   e.preventDefault();
-  navigate("library");
+  navigate("plan");
 };
-$("#heroBuild").onclick = () => navigate("builder");
-$("#howBtn").onclick = how;
-$("#aboutBtn").onclick = how;
+$("#helpBtn").onclick = how;
 $("#closeModal").onclick = closeModal;
 $("#modal").onclick = (e) => {
   if (e.target === $("#modal")) {
@@ -647,7 +622,9 @@ $$("[data-filter]").forEach(
   (b) =>
     (b.onclick = () => {
       filter = b.dataset.filter;
-      $$("[data-filter]").forEach((x) => x.classList.toggle("active", x === b));
+      $$("[data-filter]").forEach((x) =>
+        x.setAttribute("aria-pressed", String(x === b)),
+      );
       renderLibrary();
     }),
 );
@@ -671,7 +648,7 @@ document.addEventListener("keydown", (e) => {
     !$("#modal").open
   ) {
     e.preventDefault();
-    navigate("library");
+    navigate("plan");
     $("#searchInput").focus();
   }
 });
@@ -689,7 +666,7 @@ $("#trackRows").onclick = (e) => {
     setIds.push(id);
     persist();
     render();
-    toast("Added to your set. Open Set builder to arrange it.");
+    toast(`Added "${tracks.find((t) => t.id === id).title}" to the set.`);
   }
 };
 $("#trackCount").oninput = (e) =>
@@ -775,7 +752,7 @@ $("#exportBtn").onclick = () => {
   );
   toast("Set exported in play order.");
 };
-$("#savedGrid").onclick = (e) => {
+$("#savedRows").onclick = (e) => {
   const open = e.target.closest("[data-open]"),
     del = e.target.closest("[data-delete-set]");
   if (open) {
@@ -784,7 +761,7 @@ $("#savedGrid").onclick = (e) => {
     setName = s.name;
     shape = s.shape;
     persist();
-    navigate("builder");
+    navigate("plan");
   }
   if (del) {
     modal(

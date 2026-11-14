@@ -92,7 +92,7 @@ export function validateTrack(t) {
   if (!Number.isFinite(+t.energy) || +t.energy < 1 || +t.energy > 10)
     throw Error("Energy must be between 1 and 10.");
   if (!Number.isFinite(+t.duration) || +t.duration < 1 || +t.duration > 7200)
-    throw Error("Duration must be 1–7200 seconds.");
+    throw Error("Duration must be between 1 and 7200 seconds.");
   return {
     ...t,
     title: String(t.title).trim(),

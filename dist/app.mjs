@@ -145,7 +145,7 @@ let tracks = seed,
   saved = [],
   setIds = [],
   shape = "build",
-  setName = "Friday night · Vol. 01";
+  setName = "Friday night";
 try {
   if (stored) {
     if (
@@ -338,8 +338,8 @@ function editTrack(id) {
     duration: 240,
   };
   modal(
-    id ? "Track details" : "Add to your crate",
-    `<form id="trackForm"><label>Track title<input name="title" value="${esc(t.title)}" required maxlength="160"></label><label>Artist<input name="artist" value="${esc(t.artist)}" maxlength="160"></label><div class="formgrid"><label>BPM<input name="bpm" type="number" min="40" max="240" step=".1" value="${t.bpm}" required></label><label>Camelot key<select name="key">${Array.from({ length: 12 }, (_, i) => ["A", "B"].map((m) => `<option ${t.key === `${i + 1}${m}` ? "selected" : ""}>${i + 1}${m}</option>`).join("")).join("")}</select></label><label>Energy (1–10)<input name="energy" type="number" min="1" max="10" value="${t.energy}" required></label><label>Duration (seconds)<input name="duration" type="number" min="1" max="7200" value="${t.duration}" required></label></div><label>Genre<select name="genre">${["Bollywood", "House", "Hip-hop", "Other"].map((g) => `<option ${g === t.genre ? "selected" : ""}>${g}</option>`).join("")}</select></label><div class="formerror" id="formError"></div><button class="btn primary full" type="submit">${id ? "Save changes" : "Add track"}</button>${id ? '<button class="textbtn full" type="button" id="deleteTrack">Remove from library</button>' : ""}<p>${t.source === "demo" ? "Demo metadata is illustrative. Adjust it to your version of the track." : t.source === "audio" ? "Audio analysis gives estimates. Verify BPM, key and energy by ear." : "Use your DJ software’s metadata or enter your own."}</p></form>`,
+    id ? "Edit track" : "Add track",
+    `<form id="trackForm"><label>Track title<input name="title" value="${esc(t.title)}" required maxlength="160"></label><label>Artist<input name="artist" value="${esc(t.artist)}" maxlength="160"></label><div class="formgrid"><label>BPM<input name="bpm" type="number" min="40" max="240" step=".1" value="${t.bpm}" required></label><label>Camelot key<select name="key">${Array.from({ length: 12 }, (_, i) => ["A", "B"].map((m) => `<option ${t.key === `${i + 1}${m}` ? "selected" : ""}>${i + 1}${m}</option>`).join("")).join("")}</select></label><label>Energy (1 to 10)<input name="energy" type="number" min="1" max="10" value="${t.energy}" required></label><label>Duration (seconds)<input name="duration" type="number" min="1" max="7200" value="${t.duration}" required></label></div><label>Genre<select name="genre">${["Bollywood", "House", "Hip-hop", "Other"].map((g) => `<option ${g === t.genre ? "selected" : ""}>${g}</option>`).join("")}</select></label><div class="formerror" id="formError"></div><button class="btn btn-primary full" type="submit">${id ? "Save changes" : "Add track"}</button>${id ? '<button class="btn btn-quiet full" type="button" id="deleteTrack">Remove from library</button>' : ""}<p>${t.source === "demo" ? "Demo metadata only, no audio. Adjust it to match your version of the track." : t.source === "audio" ? "Analyzed from audio. Check BPM, key and energy by ear before you play out." : "Copy the values from your DJ software or enter your own."}</p></form>`,
   );
   $("#trackForm").onsubmit = (e) => {
     e.preventDefault();
@@ -356,7 +356,7 @@ function editTrack(id) {
       persist();
       render();
       closeModal();
-      toast("Track saved to your crate.");
+      toast("Track saved.");
     } catch (err) {
       $("#formError").textContent = err.message;
     }
@@ -365,7 +365,7 @@ function editTrack(id) {
     $("#deleteTrack").onclick = () => {
       modal(
         "Remove this track?",
-        `<p>“${esc(t.title)}” will also be removed from your current and saved sets.</p><button id="confirmRemove" class="btn primary full">Remove track</button>`,
+        `<p>“${esc(t.title)}” will also be removed from your current and saved sets.</p><button id="confirmRemove" class="btn btn-primary full">Remove track</button>`,
       );
       $("#confirmRemove").onclick = () => {
         tracks = tracks.filter((x) => x.id !== id);
@@ -537,7 +537,7 @@ async function importFiles(files) {
   $("#importBtn").disabled = false;
   $("#fileInput").value = "";
   toast(
-    `${added} track${added === 1 ? "" : "s"} imported${errors.length ? ` · ${errors.length} could not be imported` : ". Ready to find your flow."}`,
+    `${added} track${added === 1 ? "" : "s"} imported${errors.length ? `, ${errors.length} failed` : "."}`,
   );
   if (errors.length)
     modal(
@@ -547,8 +547,8 @@ async function importFiles(files) {
 }
 function showImport() {
   modal(
-    "Bring your sound.",
-    `<button class="dropzone" id="pickFiles">↥ &nbsp; Choose audio or CSV files<small>MP3, WAV, M4A, OGG · CSV metadata</small></button><p>Audio stays in your browser. SetFlow estimates BPM, Camelot key, and energy from the first 90 seconds, and generates a waveform.</p><p>Estimates can be wrong, especially half/double tempo. Verify and edit the results before performing. Audio playback is available for files imported in this session; metadata is saved on this device.</p><p>Already analyzed your library? Import CSV columns <b>title, artist, bpm, key, energy, duration, genre</b>. Duration is in seconds.</p>`,
+    "Import tracks",
+    `<button class="dropzone" id="pickFiles">Choose audio or CSV files<small>MP3, WAV, M4A or OGG audio, or a CSV of track metadata</small></button><p>Audio is decoded in your browser and never uploaded. BPM, Camelot key and energy are estimated from the first 90 seconds.</p><p>Estimates can be wrong, so check them before you play out. Playback works for files imported in this session; metadata is saved in this browser.</p><p>CSV columns: <b>title, artist, bpm, key, energy, duration, genre</b>. Duration is in seconds.</p>`,
   );
   $("#pickFiles").onclick = () => {
     closeModal();
@@ -592,8 +592,8 @@ function drawWave() {
 }
 function how() {
   modal(
-    "Designed for your next set.",
-    `<p><b>1. Fill your crate.</b> Explore illustrative demo tracks, enter metadata, or import your own audio and CSV files.</p><p><b>2. Shape the journey.</b> Choose a track count and energy profile. A beam-search planner explores sequences, balancing transitions and energy fit. It considers the first 100 tracks in your selected crate.</p><p><b>3. Make it yours.</b> Reorder tracks by dragging or using the arrows. Review each transition, save a set, and export a CSV.</p><p><b>Scoring:</b> 40% tempo proximity, 40% Camelot compatibility, and 20% energy proximity. Scores are planning heuristics, not guarantees of a good mix.</p><p>Your metadata and saved sets live in this browser. Download a backup from the sidebar to move devices. SetFlow does not auto-mix audio or connect to streaming services.</p>`,
+    "How SetFlow works",
+    `<p><b>1. Load tracks.</b> Use the demo metadata, add tracks by hand, or import audio files and CSVs.</p><p><b>2. Generate.</b> Pick a track count, energy profile and genre. A beam search orders tracks by transition score and fit to the profile, using the first 100 tracks that match the genre.</p><p><b>3. Adjust.</b> Reorder by dragging or with the arrow buttons, check each transition score, then save the set or export it as CSV.</p><p><b>Scoring:</b> 40% tempo proximity, 40% Camelot compatibility, and 20% energy proximity. Scores are planning heuristics, not guarantees of a good mix.</p><p>Your metadata and saved sets live in this browser. Use Download backup at the bottom of the page to move them to another device. SetFlow does not auto-mix audio or connect to streaming services.</p>`,
   );
 }
 $$("[data-view]").forEach((b) => (b.onclick = () => navigate(b.dataset.view)));
@@ -660,7 +660,7 @@ $("#trackRows").onclick = (e) => {
   if (action === "play") play(id);
   if (action === "add") {
     if (setIds.includes(id)) {
-      toast("That track is already in your set.");
+      toast("That track is already in the set.");
       return;
     }
     setIds.push(id);
@@ -685,13 +685,13 @@ $("#generateBtn").onclick = () => {
     (t) =>
       $("#buildGenre").value === "All" || t.genre === $("#buildGenre").value,
   );
-  if (!pool.length) return toast("Add some tracks to this crate first.");
+  if (!pool.length) return toast("No tracks match that genre.");
   const count = +$("#trackCount").value;
   setIds = optimize(pool, { count, shape }).map((t) => t.id);
   persist();
   renderSet();
   toast(
-    `Built your ${setIds.length}-track journey${count > pool.length ? " using every track in this crate" : ""}.`,
+    `Generated ${setIds.length} tracks${count > pool.length ? `; only ${pool.length} match the genre` : ""}.`,
   );
 };
 $("#setList").onclick = (e) => {
@@ -751,7 +751,7 @@ $("#setList").ondragend = () => {
   );
 };
 $("#saveSetBtn").onclick = () => {
-  if (!setIds.length) return toast("Add tracks before saving your set.");
+  if (!setIds.length) return toast("The set is empty.");
   const name = setName.trim() || "Untitled set";
   saved.unshift({
     id: uid(),
@@ -762,10 +762,10 @@ $("#saveSetBtn").onclick = () => {
   });
   persist();
   render();
-  toast("Set saved. Find it in Saved sets.");
+  toast(`Saved "${name}".`);
 };
 $("#exportBtn").onclick = () => {
-  if (!setIds.length) return toast("Add tracks before exporting.");
+  if (!setIds.length) return toast("The set is empty.");
   download(
     (setName.trim() || "setflow").replace(/[^a-z0-9-]/gi, "-") + ".csv",
     csv(currentSet()),
@@ -786,7 +786,7 @@ $("#savedRows").onclick = (e) => {
   if (del) {
     modal(
       "Delete this saved set?",
-      '<p>Your tracks will stay in the library.</p><button class="btn primary full" id="confirmDeleteSet">Delete set</button>',
+      '<p>Your tracks will stay in the library.</p><button class="btn btn-primary full" id="confirmDeleteSet">Delete set</button>',
     );
     $("#confirmDeleteSet").onclick = () => {
       saved = saved.filter((s) => s.id !== del.dataset.deleteSet);
@@ -822,7 +822,7 @@ $("#backupBtn").onclick = () => {
     ),
     "application/json",
   );
-  toast("Workspace backup downloaded. Audio files are not included.");
+  toast("Backup downloaded. Audio files are not included.");
 };
 $("#restoreBtn").onclick = () => $("#restoreInput").click();
 $("#restoreInput").onchange = async (e) => {
@@ -856,8 +856,8 @@ $("#restoreInput").onchange = async (e) => {
       return { ...s, trackIds: s.trackIds.filter((id) => ids.has(id)) };
     });
     modal(
-      "Restore workspace?",
-      `<p>This replaces your current library and sets with ${d.tracks.length} tracks and ${d.saved.length} saved sets. Download a backup first if you want to keep your current workspace.</p><button class="btn primary full" id="confirmRestore">Restore backup</button>`,
+      "Restore backup?",
+      `<p>This replaces your current library and sets with ${d.tracks.length} tracks and ${d.saved.length} saved sets. Download a backup first if you want to keep the current data.</p><button class="btn btn-primary full" id="confirmRestore">Restore backup</button>`,
     );
     $("#confirmRestore").onclick = () => {
       tracks = d.tracks;
@@ -871,7 +871,7 @@ $("#restoreInput").onchange = async (e) => {
       persist();
       render();
       closeModal();
-      toast("Workspace restored.");
+      toast("Backup restored.");
     };
   } catch (err) {
     toast(err.message);

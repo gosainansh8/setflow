@@ -83,6 +83,15 @@ export function parseCSV(text) {
   return rows;
 }
 export const csvCell = (v) => '"' + String(v ?? "").replaceAll('"', '""') + '"';
+// Below this chroma correlation the detected key is flagged for checking.
+// Picked from synthetic signals: clear triads and progressions score
+// 0.80 to 0.98, a lone note 0.68, noise and clusters about 0.33.
+export const LOW_KEY_CONFIDENCE = 0.7;
+export function keyIsUncertain(t) {
+  return (
+    Number.isFinite(t?.keyConfidence) && t.keyConfidence < LOW_KEY_CONFIDENCE
+  );
+}
 export function validateTrack(t) {
   if (!String(t.title || "").trim()) throw Error("Every track needs a title.");
   if (!Number.isFinite(+t.bpm) || +t.bpm < 40 || +t.bpm > 240)
@@ -101,5 +110,12 @@ export function validateTrack(t) {
     bpm: +t.bpm,
     energy: +t.energy,
     duration: +t.duration,
+    keyConfidence:
+      t.keyConfidence != null &&
+      Number.isFinite(+t.keyConfidence) &&
+      +t.keyConfidence >= 0 &&
+      +t.keyConfidence <= 1
+        ? +t.keyConfidence
+        : undefined,
   };
 }

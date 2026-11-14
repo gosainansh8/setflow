@@ -5,6 +5,7 @@ import {
   parseCSV,
   csvCell,
   validateTrack,
+  keyIsUncertain,
 } from "./core.mjs";
 const $ = (s) => document.querySelector(s),
   $$ = (s) => [...document.querySelectorAll(s)],
@@ -250,6 +251,14 @@ function totalTime(sec) {
 function bars(e) {
   return `<div class="energy" aria-label="Energy ${e} of 10">${Array.from({ length: 10 }, (_, i) => `<i class="${i < e ? "on" : ""}"></i>`).join("")}<span>${e}</span></div>`;
 }
+// Key cell: the Camelot key, plus the detection confidence for analyzed
+// tracks. Low-confidence keys are marked so they get checked by ear.
+function keyCell(t) {
+  if (!Number.isFinite(t.keyConfidence)) return esc(t.key);
+  const low = keyIsUncertain(t),
+    value = t.keyConfidence.toFixed(2);
+  return `${esc(t.key)}<span class="conf${low ? " low" : ""}" title="${low ? "Low key confidence, check by ear. " : ""}Chroma correlation with the key profile: ${value}">${value}${low ? " ?" : ""}</span>`;
+}
 function currentSet() {
   return setIds.map((id) => tracks.find((t) => t.id === id)).filter(Boolean);
 }
@@ -288,7 +297,7 @@ function renderLibrary() {
   $("#trackRows").innerHTML = ts
     .map((t, i) => {
       const inSet = setIds.includes(t.id);
-      return `<tr><td class="num">${i + 1}</td><td class="title" title="${esc(t.title)}">${esc(t.title)}${t.source === "demo" ? '<span class="tag" title="Demo metadata, no audio">demo</span>' : ""}</td><td class="artist" title="${esc(t.artist)}">${esc(t.artist)}</td><td class="num">${t.bpm}</td><td class="mono">${esc(t.key)}</td><td>${bars(t.energy)}</td><td class="num">${duration(t.duration)}</td><td><div class="rowactions">${media.has(t.id) ? `<button class="iconbtn" data-action="play" data-id="${esc(t.id)}" aria-label="Play ${esc(t.title)}" title="Play">▶</button>` : ""}<button class="iconbtn" data-action="edit" data-id="${esc(t.id)}" aria-label="Edit ${esc(t.title)}" title="Edit">✎</button><button class="iconbtn" data-action="add" data-id="${esc(t.id)}" aria-label="${inSet ? `${esc(t.title)} is in the set` : `Add ${esc(t.title)} to set`}" title="${inSet ? "In set" : "Add to set"}"${inSet ? ' aria-disabled="true"' : ""}>${inSet ? "✓" : "+"}</button></div></td></tr>`;
+      return `<tr><td class="num">${i + 1}</td><td class="title" title="${esc(t.title)}">${esc(t.title)}${t.source === "demo" ? '<span class="tag" title="Demo metadata, no audio">demo</span>' : ""}</td><td class="artist" title="${esc(t.artist)}">${esc(t.artist)}</td><td class="num">${t.bpm}</td><td class="mono">${keyCell(t)}</td><td>${bars(t.energy)}</td><td class="num">${duration(t.duration)}</td><td><div class="rowactions">${media.has(t.id) ? `<button class="iconbtn" data-action="play" data-id="${esc(t.id)}" aria-label="Play ${esc(t.title)}" title="Play">▶</button>` : ""}<button class="iconbtn" data-action="edit" data-id="${esc(t.id)}" aria-label="Edit ${esc(t.title)}" title="Edit">✎</button><button class="iconbtn" data-action="add" data-id="${esc(t.id)}" aria-label="${inSet ? `${esc(t.title)} is in the set` : `Add ${esc(t.title)} to set`}" title="${inSet ? "In set" : "Add to set"}"${inSet ? ' aria-disabled="true"' : ""}>${inSet ? "✓" : "+"}</button></div></td></tr>`;
     })
     .join("");
   $("#emptyLibrary").hidden = !!ts.length;
@@ -313,7 +322,7 @@ function renderSet() {
         score = prev ? transition(prev, t) : null,
         grade = score >= 80 ? "good" : score >= 65 ? "ok" : "poor",
         delta = prev ? t.bpm - prev.bpm : 0;
-      return `<li class="setrow" draggable="true" data-index="${i}">${prev ? `<div class="transition ${grade}" title="Transition score out of 100"><span class="score">${score}</span><span>${delta >= 0 ? "+" : ""}${delta} BPM</span><span>${esc(prev.key)} → ${esc(t.key)}</span></div>` : ""}<div class="setrow-main"><span class="pos mono">${i + 1}</span><span class="who"><strong>${esc(t.title)}</strong><span>${esc(t.artist)}</span></span><span class="mono">${t.bpm}</span><span class="mono">${esc(t.key)}</span><div class="rowactions"><button class="iconbtn" data-move="${i}" data-step="-1" aria-label="Move ${esc(t.title)} up">↑</button><button class="iconbtn" data-move="${i}" data-step="1" aria-label="Move ${esc(t.title)} down">↓</button><button class="iconbtn" data-remove="${i}" aria-label="Remove ${esc(t.title)} from set">×</button></div></div></li>`;
+      return `<li class="setrow" draggable="true" data-index="${i}">${prev ? `<div class="transition ${grade}" title="Transition score out of 100"><span class="score">${score}</span><span>${delta >= 0 ? "+" : ""}${delta} BPM</span><span>${esc(prev.key)} → ${esc(t.key)}</span></div>` : ""}<div class="setrow-main"><span class="pos mono">${i + 1}</span><span class="who"><strong>${esc(t.title)}</strong><span>${esc(t.artist)}</span></span><span class="mono">${t.bpm}</span><span class="mono">${esc(t.key)}${keyIsUncertain(t) ? '<span class="conf low" title="Low key confidence, check by ear">?</span>' : ""}</span><div class="rowactions"><button class="iconbtn" data-move="${i}" data-step="-1" aria-label="Move ${esc(t.title)} up">↑</button><button class="iconbtn" data-move="${i}" data-step="1" aria-label="Move ${esc(t.title)} down">↓</button><button class="iconbtn" data-remove="${i}" aria-label="Remove ${esc(t.title)} from set">×</button></div></div></li>`;
     })
     .join("");
   $("#setEmpty").hidden = !!list.length;
@@ -399,7 +408,7 @@ function editTrack(id) {
   };
   modal(
     id ? "Edit track" : "Add track",
-    `<form id="trackForm"><label>Track title<input name="title" value="${esc(t.title)}" required maxlength="160"></label><label>Artist<input name="artist" value="${esc(t.artist)}" maxlength="160"></label><div class="formgrid"><label>BPM<input name="bpm" type="number" min="40" max="240" step=".1" value="${t.bpm}" required></label><label>Camelot key<select name="key">${Array.from({ length: 12 }, (_, i) => ["A", "B"].map((m) => `<option ${t.key === `${i + 1}${m}` ? "selected" : ""}>${i + 1}${m}</option>`).join("")).join("")}</select></label><label>Energy (1 to 10)<input name="energy" type="number" min="1" max="10" value="${t.energy}" required></label><label>Duration (seconds)<input name="duration" type="number" min="1" max="7200" value="${t.duration}" required></label></div><label>Genre<select name="genre">${[...new Set([...genreChoices, t.genre])].map((g) => `<option ${g === t.genre ? "selected" : ""}>${g}</option>`).join("")}</select></label><div class="formerror" id="formError"></div><button class="btn btn-primary full" type="submit">${id ? "Save changes" : "Add track"}</button>${id ? '<button class="btn btn-quiet full" type="button" id="deleteTrack">Remove from library</button>' : ""}<p>${t.source === "demo" ? "Demo metadata only, no audio. Adjust it to match your version of the track." : t.source === "audio" ? "Analyzed from audio. Check BPM, key and energy by ear before you play out." : "Copy the values from your DJ software or enter your own."}</p></form>`,
+    `<form id="trackForm"><label>Track title<input name="title" value="${esc(t.title)}" required maxlength="160"></label><label>Artist<input name="artist" value="${esc(t.artist)}" maxlength="160"></label><div class="formgrid"><label>BPM<input name="bpm" type="number" min="40" max="240" step=".1" value="${t.bpm}" required></label><label>Camelot key<select name="key">${Array.from({ length: 12 }, (_, i) => ["A", "B"].map((m) => `<option ${t.key === `${i + 1}${m}` ? "selected" : ""}>${i + 1}${m}</option>`).join("")).join("")}</select></label><label>Energy (1 to 10)<input name="energy" type="number" min="1" max="10" value="${t.energy}" required></label><label>Duration (seconds)<input name="duration" type="number" min="1" max="7200" value="${t.duration}" required></label></div><label>Genre<select name="genre">${[...new Set([...genreChoices, t.genre])].map((g) => `<option ${g === t.genre ? "selected" : ""}>${g}</option>`).join("")}</select></label>${Number.isFinite(t.keyConfidence) ? `<p class="${keyIsUncertain(t) ? "warn" : ""}">Detected key confidence: <b class="mono">${t.keyConfidence.toFixed(2)}</b>${keyIsUncertain(t) ? ", low. Check the key by ear." : "."} Changing the key marks it as checked.</p>` : ""}<div class="formerror" id="formError"></div><button class="btn btn-primary full" type="submit">${id ? "Save changes" : "Add track"}</button>${id ? '<button class="btn btn-quiet full" type="button" id="deleteTrack">Remove from library</button>' : ""}<p>${t.source === "demo" ? "Demo metadata only, no audio. Adjust it to match your version of the track." : t.source === "audio" ? "Analyzed from audio. Check BPM, key and energy by ear before you play out." : "Copy the values from your DJ software or enter your own."}</p></form>`,
   );
   $("#trackForm").onsubmit = (e) => {
     e.preventDefault();
@@ -408,6 +417,8 @@ function editTrack(id) {
       const next = validateTrack({
         ...t,
         ...input,
+        // A key the user changed by hand is their call, not an estimate.
+        keyConfidence: input.key === t.key ? t.keyConfidence : undefined,
         id: id || uid(),
         source: t.source || "manual",
       });
@@ -563,6 +574,7 @@ async function importAudio(file) {
       genre: "Other",
       bpm: result.bpm,
       key: result.key,
+      keyConfidence: result.keyConfidence,
       energy: result.energy,
       duration: Math.max(1, Math.round(buffer.duration)),
       source: "audio",

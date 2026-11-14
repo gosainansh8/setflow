@@ -7,6 +7,8 @@ import {
   parseCSV,
   csvCell,
   validateTrack,
+  keyIsUncertain,
+  LOW_KEY_CONFIDENCE,
 } from "../dist/core.mjs";
 const track = (id, bpm, key, energy) => ({
   id,
@@ -67,4 +69,27 @@ test("metadata rejects NaN, bad keys, invalid duration", () => {
     { title: "" },
   ])
     assert.throws(() => validateTrack({ ...good, ...patch }));
+});
+test("key confidence is validated and low values are flagged", () => {
+  const good = track("t", 120, "8A", 5);
+  assert.equal(validateTrack(good).keyConfidence, undefined);
+  assert.equal(
+    validateTrack({ ...good, keyConfidence: 0.83 }).keyConfidence,
+    0.83,
+  );
+  for (const bad of [-0.1, 1.5, "abc", NaN])
+    assert.equal(
+      validateTrack({ ...good, keyConfidence: bad }).keyConfidence,
+      undefined,
+    );
+  assert.equal(
+    keyIsUncertain(good),
+    false,
+    "no estimate means nothing to flag",
+  );
+  assert.equal(
+    keyIsUncertain({ keyConfidence: LOW_KEY_CONFIDENCE - 0.01 }),
+    true,
+  );
+  assert.equal(keyIsUncertain({ keyConfidence: LOW_KEY_CONFIDENCE }), false);
 });

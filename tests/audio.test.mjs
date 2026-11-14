@@ -67,3 +67,44 @@ test("tempos across the range avoid octave errors", () => {
     assert.ok(Math.abs(r.bpm - bpm) <= 1, `${bpm} BPM read as ${r.bpm}`);
   }
 });
+// Sustained sine-tone chords. MIDI note numbers: 60 is middle C.
+function chords(progression, { seconds = 20, rate = 11025 } = {}) {
+  const hz = (m) => 440 * 2 ** ((m - 69) / 12),
+    samples = new Float32Array(rate * seconds);
+  for (let i = 0; i < samples.length; i++) {
+    const t = i / rate,
+      notes = progression[Math.floor(t / 2) % progression.length];
+    samples[i] =
+      (0.5 * notes.reduce((a, m) => a + Math.sin(2 * Math.PI * hz(m) * t), 0)) /
+      notes.length;
+  }
+  return samples;
+}
+test("clear major and minor material gives the right key with high confidence", () => {
+  const cMajor = analyze(
+    chords([
+      [60, 64, 67],
+      [65, 69, 72],
+      [67, 71, 74],
+    ]),
+  );
+  assert.equal(cMajor.key, "8B");
+  assert.ok(cMajor.keyConfidence >= 0.7, JSON.stringify(cMajor.keyConfidence));
+  const aMinor = analyze(
+    chords([
+      [57, 60, 64],
+      [62, 65, 69],
+      [64, 68, 71],
+    ]),
+  );
+  assert.equal(aMinor.key, "8A");
+  assert.ok(aMinor.keyConfidence >= 0.7, JSON.stringify(aMinor.keyConfidence));
+});
+test("atonal input is reported with low key confidence", () => {
+  const cluster = analyze(
+    chords([[60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71]]),
+  );
+  assert.ok(cluster.keyConfidence < 0.7, JSON.stringify(cluster.keyConfidence));
+  const tritone = analyze(chords([[60, 66]]));
+  assert.ok(tritone.keyConfidence < 0.7, JSON.stringify(tritone.keyConfidence));
+});

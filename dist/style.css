@@ -399,6 +399,18 @@ td.artist {
   font-weight: 400;
   color: var(--text-muted);
 }
+.conf {
+  margin-left: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+.conf.low {
+  color: var(--warn);
+  font-weight: 600;
+}
+#modalBody p.warn {
+  color: var(--warn);
+}
 .energy {
   display: inline-flex;
   align-items: center;

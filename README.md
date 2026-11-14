@@ -2,6 +2,16 @@
 
 I DJ Bollywood sets, and planning the order of tracks by hand meant juggling tempo, key, and energy across dozens of songs. SetFlow is a browser app I built to do that: import local audio or CSV metadata, generate an energy-aware sequence, inspect each transition, and save or export the set.
 
+**Live demo: https://gosainansh8.github.io/setflow/** (runs entirely in your browser; nothing is uploaded)
+
+## How to use it
+
+1. **Fill your crate.** Explore the demo tracks, drop in local audio files, or import a CSV of track metadata.
+2. **Check the analysis.** For audio files, SetFlow estimates BPM, Camelot key, and energy. Fix anything that sounds wrong in the library.
+3. **Pick an energy profile.** Build rises steadily, Rise & release peaks mid-set, and Steady holds one level.
+4. **Generate a set.** The planner orders up to 20 tracks and shows a score for every transition.
+5. **Make it yours.** Reorder by dragging or with the keyboard, then save the set or export the play order as CSV.
+
 ## Run locally
 
 Requires Python 3 for a local server and Node.js 18+ for tests. There are no npm runtime dependencies or build steps.

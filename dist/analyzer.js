@@ -46,9 +46,75 @@ function corr(a, b) {
   }
   return dot / Math.sqrt(aa * bb || 1);
 }
+const MIN_BPM = 60,
+  MAX_BPM = 180;
+// Average product of the onset envelope with itself shifted by one beat.
+// Dividing by the number of terms keeps long lags (slow tempos) from being
+// penalized just because fewer frames overlap.
+function tempoScore(onset, frameRate, bpm) {
+  const lag = (frameRate * 60) / bpm;
+  let sum = 0,
+    n = 0;
+  for (let i = Math.ceil(lag); i < onset.length; i++) {
+    const at = i - lag,
+      j = Math.floor(at),
+      f = at - j;
+    sum += onset[i] * (onset[j] * (1 - f) + (onset[j + 1] ?? 0) * f);
+    n++;
+  }
+  return n ? sum / n : 0;
+}
+// Comb score: compare hits 1, 2, 3 and 4 beats apart. A small error in the
+// beat period adds up over several beats, so the peak is much sharper than
+// with a single lag. Lags longer than half the clip are skipped.
+function combScore(onset, frameRate, bpm) {
+  const lag = (frameRate * 60) / bpm;
+  let sum = 0,
+    terms = 0;
+  for (let k = 1; k <= 4 && k * lag < onset.length / 2; k++) {
+    sum += tempoScore(onset, frameRate, bpm / k);
+    terms++;
+  }
+  return terms ? sum / terms : 0;
+}
+function bestInRange(onset, frameRate, lo, hi) {
+  let best = lo,
+    bestScore = -1;
+  for (let b = Math.max(MIN_BPM, lo); b <= Math.min(MAX_BPM, hi); b++) {
+    const s = combScore(onset, frameRate, b);
+    if (s > bestScore) {
+      bestScore = s;
+      best = b;
+    }
+  }
+  return best;
+}
+// Octave errors: a beat at B BPM also lines up at twice its period, so B/2
+// scores about as well as B, and the raw maximum often lands on half time.
+// The reverse is not true: a beat at B/2 has nothing halfway between its
+// hits, so B scores near zero at a one-beat lag. So if doubling the tempo
+// keeps at least OCTAVE_RATIO of the one-beat score, the faster tempo is the
+// real beat. This check uses the single-lag score on purpose: the comb would
+// give the double of a slow beat partial credit from its even-numbered lags.
+const OCTAVE_RATIO = 0.5;
+function estimateTempo(onset, frameRate) {
+  let bpm = bestInRange(onset, frameRate, MIN_BPM, MAX_BPM);
+  while (bpm * 2 <= MAX_BPM + 2) {
+    const double = bestInRange(onset, frameRate, bpm * 2 - 2, bpm * 2 + 2);
+    if (
+      tempoScore(onset, frameRate, double) <
+      OCTAVE_RATIO * tempoScore(onset, frameRate, bpm)
+    )
+      break;
+    bpm = double;
+  }
+  return bpm;
+}
 self.onmessage = ({ data: { samples, sampleRate } }) => {
   try {
-    const hop = 256,
+    // 128-sample hop at 11,025 Hz is about 11.6 ms per frame, fine enough
+    // to tell 140 BPM (a beat every 36.9 frames) from 142 (36.4 frames).
+    const hop = 128,
       env = [];
     let square = 0;
     for (let i = 0; i < samples.length; i++) square += samples[i] * samples[i];
@@ -61,23 +127,16 @@ self.onmessage = ({ data: { samples, sampleRate } }) => {
       for (let j = 0; j < hop; j++) e += samples[i + j] * samples[i + j];
       env.push(Math.sqrt(e / hop));
     }
-    const onset = env.map((v, i) => Math.max(0, v - (env[i - 1] || v)));
-    let best = 0,
-      bpm = 120;
-    for (let b = 70; b <= 180; b++) {
-      const lag = ((sampleRate / hop) * 60) / b;
-      let sum = 0;
-      for (let i = Math.ceil(lag * 2); i < onset.length; i++) {
-        const at = i - lag,
-          j = Math.floor(at),
-          f = at - j;
-        sum += onset[i] * (onset[j] * (1 - f) + onset[j + 1] * f);
-      }
-      if (sum > best) {
-        best = sum;
-        bpm = b;
-      }
-    }
+    // Positive change in loudness from the previous frame. Use i > 0 rather
+    // than `env[i - 1] || v`: that treats a silent previous frame (0) as
+    // missing and erases every hit that follows silence.
+    const rise = env.map((v, i) => (i > 0 ? Math.max(0, v - env[i - 1]) : 0));
+    // Spread each hit over neighboring frames (1-2-1 kernel) so a beat that
+    // falls between two frames still lines up with the lag being tested.
+    const onset = rise.map(
+      (v, i) => ((rise[i - 1] ?? 0) + 2 * v + (rise[i + 1] ?? 0)) / 4,
+    );
+    const bpm = estimateTempo(onset, sampleRate / hop);
     const chroma = Array(12).fill(0),
       n = 2048,
       frames = Math.min(300, Math.floor(samples.length / n));
